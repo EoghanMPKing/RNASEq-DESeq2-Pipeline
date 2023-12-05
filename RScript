@@ -1,0 +1,77 @@
+#Load Deseq2
+library("DESeq2")
+library("ggplot2")
+
+setwd("~/R?sultats/ARN (RNASeq_qPCR)/Manip RNAseq/Sortie CLC")
+
+
+cts <- read.table("Racines_counts.csv",sep=";",header=TRUE,dec=",",na.string="NA",row.names=1)
+
+#transformer en matrice
+
+countdata <- as.matrix(cts)
+
+#Fichier Conditions
+
+
+condition <- factor(c(rep("RC", 3), rep("RK", 3), rep("RV", 3)))
+condition <- factor(c(rep("RC", 3), rep("RV", 3)))
+
+coldata <- data.frame(row.names=colnames(countdata), condition)
+
+#Fichier entr?e deseq2
+
+dds <- DESeqDataSetFromMatrix(countData=countdata, colData=coldata, design=~condition)
+
+#DESeq pipeline
+dds <- DESeq(dds)
+res <- results(dds)
+summary(res)
+
+#estimation taille facteurs -> facteurs de normalisation
+dds<-estimateSizeFactors(dds)
+sizeFactors(dds)
+
+# visualisation dispersion
+plotDispEsts(dds, main="Dispersion plot")
+
+rld<-rlog(dds,blind=FALSE)
+
+
+
+data <- plotPCA(rld, intgroup=c("condition"), returnData=TRUE)
+percentVar <- round(100 * attr(data, "percentVar"))
+ggplot(data, aes(PC1, PC2, color=condition)) + geom_point(size=3) + xlab(paste0("PC1: ",percentVar[1],"% variance"))  + ylab(paste0("PC2: ",percentVar[2],"% variance"))+geom_text(aes(label=rownames(data)),hjust=0.5, vjust=-1,size=2.5)
+
+
+install.packages("RColorBrewer")
+install.packages("pheatmap")
+
+library("RColorBrewer")
+library("pheatmap")
+
+sampledists<-dist(t(assay(rld)))
+sampledistmatrix<-as.matrix(sampledists)
+colors<-colorRampPalette( rev(brewer.pal(6, "Blues")) )(255)
+pheatmap(sampledistmatrix,clustering_distance_rows=sampledists,clustering_distance_cols=sampledists,col=colors)
+
+
+#recuperation des donn?es normalis?es. c'est une normalisation rle. donnees normalisees=count/sj
+
+normalizedcount<- counts(dds, normalized = TRUE)
+write.csv(normalizedcount, file="Roots_norm.csv") 
+
+write.csv(res, "C:/deseq2RKV.csv")
+
+
+
+rownames(sampledistmatrix) <- paste( rld$treatment,
+                                     rld$patient, sep="-" )
+colnames(sampledistmatrix) <- NULL
+library( "gplots" )
+library( "RColorBrewer" )
+colours = colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+heatmap.2( sampledistmatrix, trace="none", col=colours)
+
+
+
